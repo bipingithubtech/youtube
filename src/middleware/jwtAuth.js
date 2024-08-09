@@ -10,7 +10,7 @@ export const jwtAuthentication = async () => {
     if (!token) {
       throw new ApiError(401, "unuauthorize request");
     }
-    const decodeToken = jwt.verify(token, process.env.AcessToken);
+    const decodeToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     const user = await User.findById(decodeToken._id).select(
       "-password - refreshToken"
     );

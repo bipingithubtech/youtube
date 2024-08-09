@@ -61,15 +61,17 @@ userSchema.methods.isPasswordCorrect = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
 
-userSchema.method.AcessToken = async function () {
-  jwt.sign(
+userSchema.methods.generateAccessToken = async function () {
+  return jwt.sign(
     { _id: this._id, email: this.email, username: this.username },
-    process.env.AcessToken,
+    process.env.ACCESS_TOKEN_SECRET,
     { expiresIn: "1h" }
   );
 };
-userSchema.method.generateRefreshToken = async function () {
-  jwt.sign({ _id: this._id }, process.env.refreshToken, { expiresIn: "1h" });
+userSchema.methods.generateRefreshToken = async function () {
+  return jwt.sign({ _id: this._id }, process.env.REFRESH_TOKEN_SECRET, {
+    expiresIn: "1h",
+  });
 };
 
 const User = mongoose.model("User", userSchema);

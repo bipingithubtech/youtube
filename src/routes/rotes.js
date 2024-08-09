@@ -1,5 +1,5 @@
 import express from "express";
-import { resgeister } from "../controllers/userController.js";
+import { Login, resgeister } from "../controllers/userController.js";
 import { upload } from "../middleware/multer.js";
 
 export const Router = express.Router();
@@ -11,3 +11,4 @@ Router.route("/signup").post(
   ]),
   resgeister
 );
+Router.route("/login").post(Login);

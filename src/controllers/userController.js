@@ -6,12 +6,15 @@ import jwt from "jsonwebtoken";
 
 const generateAcessTokenAndRefreshToken = async (userId) => {
   const user = await User.findById(userId);
-  const acaesstoken = user.AcessToken();
-  const RefreshToken = user.generateRefreshToken();
+  const accessToken = await user.generateAccessToken();
+  const RefreshToken = await user.generateRefreshToken();
   user.refreshToken = RefreshToken;
 
+  console.log("Access Token:", accessToken);
+  console.log("Refresh Token:", RefreshToken);
+
   await user.save({ validateBeforeSave: false });
-  return { acaesstoken, RefreshToken };
+  return { accessToken, RefreshToken };
 };
 
 export const resgeister = async (req, res) => {
@@ -92,27 +95,28 @@ export const Login = async (req, res) => {
     throw new ApiError(404, "invalid username or emial");
   }
 
-  const isPasswordValid = await User.isPasswordCorrect(password);
+  const isPasswordValid = await user.isPasswordCorrect(password);
   if (!isPasswordValid) {
     throw new ApiError(401, "invalid password");
   }
 
-  const { AcessToken, RefreshToken } = generateAcessTokenAndRefreshToken(
+  const { accessToken, RefreshToken } = await generateAcessTokenAndRefreshToken(
     user._id
   );
   const loggedInUser = await User.findById(user._id).select(
-    "-password - refreshToken"
+    "-password -refreshToken"
   );
   const options = {
     httpOnly: true,
-    secure: true,
+    secure: false,
+    sameSite: "strict",
   };
   res
     .status(200)
-    .cookie("accessToken", AcessToken, options)
-    .cookie("RefreshToken", RefreshToken, options)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", RefreshToken, options)
     .json(
-      new ApiResponse(200, { user: loggedInUser, AcessToken, RefreshToken })
+      new ApiResponse(200, { user: loggedInUser, accessToken, RefreshToken })
     );
 };
 export const logout = async (req, res) => {
@@ -123,7 +127,7 @@ export const logout = async (req, res) => {
   );
 };
 
-const refectch = async (req, res) => {
+export const refectch = async (req, res) => {
   const incomingRefresToken = req.cookies.RefreshToken || req.body.RefreshToken;
   if (!incomingRefresToken) {
   }
@@ -164,4 +168,79 @@ const refectch = async (req, res) => {
         )
       );
   } catch {}
+};
+
+export const forgotPassword = async (req, res) => {
+  const { oldpassword, newPassword } = req.body;
+  const user = User.findById(req.user._id);
+
+  const isCorrect = await user.isPasswordCorrect(oldpassword);
+
+  if (!isCorrect) {
+    throw new ApiError(400, "invalid user");
+  }
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+
+  res.status(200).json(new ApiResponse(200, {}, "password reset sucessfully"));
+};
+export const getTheUser = async (req, res) => {
+  return res
+    .status(200)
+    .json(new ApiResponse(200, req.user, "current user fetched sucessfully"));
+};
+
+const updateAcountDetail = async (req, res) => {
+  const { username, email } = req.body;
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: { username, email } },
+    { new: true }
+  ).select("-password");
+
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "account detail updated sucessfully"));
+};
+
+export const UpdateAvatara = async (req, res) => {
+  const avatarLocalPath = req.file?.path;
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "avatar file not found");
+  }
+  const avatar = await uploadCloudinary(avatarLocalPath);
+  if (!avatar.url) {
+    throw new ApiError(400, "avatar file not found");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: { avatar: avatar.url } },
+    { new: true }
+  ).select("-password");
+  return res.status(200).json(new ApiResponse(200, user, "avatar updated"));
+};
+
+export const UpdateCoverImage = async (req, res) => {
+  const coverImageLocalPath = req.file?.path;
+  if (!coverImageLocalPath) {
+    throw new ApiError(400, "avatar file not found");
+  }
+  const coverImage = await uploadCloudinary(coverImageLocalPath);
+  if (!coverImage.url) {
+    throw new ApiError(400, "avatar file not found");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: { coverImage: coverImage.url } },
+    { new: true }
+  ).select("-password");
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "cover image  updated sucessfully"));
 };
